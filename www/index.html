@@ -1,1 +1,314 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>İşitme Taraması</title>
+  <style>
+    [hidden] { display: none !important; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; min-height: 100vh; background: #0f1115; color: #fff; display: flex; justify-content: center; align-items: flex-start; padding: 14px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+    .card { background: #181b22; border: 1px solid #282d37; border-radius: 18px; padding: 18px; width: 100%; max-width: 440px; margin-bottom: 12px; }
+    h2 { margin: 0 0 6px; color: #00e676; font-size: 20px; }
+    p { color: #c9ced6; font-size: 14px; line-height: 1.5; margin: 8px 0; }
+    .small { font-size: 12px; color: #8b929e; }
+    .warn { background: #2a2015; color: #ffb74d; border-radius: 10px; padding: 10px; font-size: 12.5px; line-height: 1.45; margin: 10px 0; }
+    .check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: #d6dae0; margin: 10px 0; cursor: pointer; }
+    .check input { width: 18px; height: 18px; margin-top: 2px; accent-color: #00e676; flex-shrink: 0; }
+    .btn { width: 100%; padding: 15px; font-size: 16px; font-weight: 700; border-radius: 13px; border: none; cursor: pointer; margin-top: 10px; }
+    .btn-primary { background: #00e676; color: #000; }
+    .btn-primary:disabled { background: #2a3a30; color: #6b7a70; cursor: not-allowed; }
+    .btn-secondary { background: #252a34; color: #fff; border: 1px solid #3a4150; }
+    .btn-danger { background: #ff5252; color: #fff; }
+    .big-btn { width: 100%; padding: 42px 10px; font-size: 26px; font-weight: 800; border-radius: 22px; border: none; background: #00e676; color: #000; margin: 14px 0; cursor: pointer; }
+    .big-btn:active { transform: scale(0.98); }
+    .progress { height: 8px; background: #252a34; border-radius: 6px; overflow: hidden; margin-top: 10px; }
+    .progress > div { height: 100%; width: 0%; background: #00e676; transition: width 0.3s; }
+    .status { font-size: 15px; color: #e0e4ea; margin-top: 6px; text-align: center; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+    th, td { padding: 9px 6px; text-align: center; border-bottom: 1px solid #282d37; }
+    th { color: #8b929e; font-weight: 600; font-size: 12px; }
+    .verdict { font-size: 14px; line-height: 1.5; color: #e0e4ea; background: #1d222b; border-radius: 12px; padding: 12px; margin-top: 12px; }
+    .hist-item { background: #1d222b; border-radius: 10px; padding: 10px; margin-top: 8px; font-size: 13px; color: #c9ced6; }
+  </style>
+</head>
+<body>
 
+  <!-- Giriş ekranı -->
+  <div class="card" id="introView">
+    <h2>İşitme Taraması</h2>
+    <p>Bu ekran iki kulağı aynı cihazda ve aynı koşullarda karşılaştırmak için bir <strong>tarama</strong> aracıdır. Sonuçlar tıbbi tanı değildir ve klinik odyometrenin yerini tutmaz. Ölçüm kalibre edilmediği için mutlak dB değeri vermez; yalnızca sağ ile sol kulak arasındaki farkı ve zaman içindeki değişimi göstermeyi amaçlar.</p>
+
+    <div class="warn">
+      Sesi kısık tut ve test sırasında sistem sesini değiştirme. Kulaklığı yüksek sesle uzun süre takma. Bu uygulama mevcut ses ayarlarını ve kazanç değerlerini kullanmaz; test kendi sabit sinyalini üretir.
+    </div>
+
+    <label class="check"><input type="checkbox" id="chkWired"> Kablolu kulaklık kullanıyorum (Bluetooth gecikmesi ve codec ölçümü bozar).</label>
+    <label class="check"><input type="checkbox" id="chkQuiet"> Sessiz bir ortamdayım ve sistem sesini test boyunca sabit tutacağım.</label>
+    <label class="check"><input type="checkbox" id="chkLR"> Sağ ve sol kulaklığı doğru taktığımdan emin olacağım (aşağıdaki kontrolle doğrulayabilirsin).</label>
+
+    <button class="btn btn-secondary" id="checkLRBtn">Sol / Sağ kontrolü dinle</button>
+    <button class="btn btn-primary" id="startBtn" disabled>Taramayı Başlat</button>
+    <button class="btn btn-secondary" id="historyBtn">Geçmiş Sonuçlar</button>
+    <p class="small" id="introMsg">Tahmini süre: 6–8 dakika. Ölçüm sırasında her ses duyduğunda büyük butona bas.</p>
+  </div>
+
+  <!-- Test ekranı -->
+  <div class="card" id="testView" hidden>
+    <div class="small" id="earLabel">—</div>
+    <div class="status" id="statusText">Hazırlanıyor...</div>
+    <div class="progress"><div id="progressBar"></div></div>
+    <button class="big-btn" id="heardBtn">🔊 DUYDUM</button>
+    <p class="small" style="text-align:center">Ses duymadığında hiçbir şey yapma. Ses gelmediğinde basmak yanlış sonuç üretir.</p>
+    <button class="btn btn-danger" id="stopBtn">Testi Durdur</button>
+  </div>
+
+  <!-- Sonuç ekranı -->
+  <div class="card" id="resultView" hidden>
+    <h2>Sonuç</h2>
+    <p class="small">Değerler "kayıp puanı"dır: 0 en hassas, yükseldikçe o frekansta daha yüksek ses gerektiğini gösterir. Bu puan kalibre edilmemiştir, yalnızca iki kulağı kendi içinde karşılaştırmak için kullan.</p>
+    <table>
+      <thead><tr><th>Frekans</th><th>Sağ</th><th>Sol</th><th>Fark (S−So)</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+    <div class="verdict" id="verdict"></div>
+    <div class="warn" id="reliability" hidden></div>
+    <button class="btn btn-primary" id="newTestBtn">Yeni Test</button>
+    <button class="btn btn-secondary" id="resultHistoryBtn">Geçmiş Sonuçlar</button>
+  </div>
+
+  <!-- Geçmiş ekranı -->
+  <div class="card" id="historyView" hidden>
+    <h2>Geçmiş Sonuçlar</h2>
+    <div id="historyList"></div>
+    <button class="btn btn-secondary" id="backBtn">Geri</button>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const FREQS = [250, 500, 1000, 2000, 4000, 8000];
+  const EARS = [{ key: 'sag', label: 'Sağ', pan: 1 }, { key: 'sol', label: 'Sol', pan: -1 }];
+  const MAX_AMP = 0.25;      // Sabit üst sınır: güvenlik için hiçbir zaman bundan yükseğe çıkmaz
+  const START_L = 60;        // Ölçüm en sessiz seviyeden başlar
+  const STEP_DB = 5;         // Her adımda ses 5 "birim" artar
+  const CATCH_P = 0.15;      // Sesin olmadığı kontrol denemelerinin oranı
+  const TONE_MS = 1000;
+  const RESP_MS = 2000;
+  const HISTORY_KEY = 'tarama_gecmis_v1';
+
+  let ctx = null, stopFlag = false;
+  let awaiting = false, isCatchNow = false, respTimer = null, respResolve = null;
+  let falseAlarms = 0, catchTotal = 0;
+
+  // ---- Yardımcılar ----
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  function ampFor(L) { return MAX_AMP * Math.pow(10, -L / 20); }
+
+  function playTone(freq, pan, L) {
+    const t0 = ctx.currentTime + 0.05, dur = TONE_MS / 1000, a = ampFor(L);
+    const osc = ctx.createOscillator(), g = ctx.createGain(), p = ctx.createStereoPanner();
+    osc.type = 'sine'; osc.frequency.value = freq; p.pan.value = pan;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(a, t0 + 0.05);
+    g.gain.setValueAtTime(a, t0 + dur - 0.05);
+    g.gain.linearRampToValueAtTime(0, t0 + dur);
+    osc.connect(g); g.connect(p); p.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  }
+
+  // ---- Yanıt bekleme ----
+  function waitResponse(catchTrial) {
+    return new Promise(resolve => {
+      isCatchNow = catchTrial; awaiting = true; respResolve = resolve;
+      respTimer = setTimeout(() => finish(false), TONE_MS + RESP_MS);
+    });
+  }
+  function finish(heard) {
+    if (!awaiting) return;
+    awaiting = false; clearTimeout(respTimer);
+    const r = respResolve; respResolve = null; r(heard);
+  }
+  $('heardBtn').onclick = () => {
+    if (!awaiting) return;
+    if (isCatchNow) { falseAlarms++; finish(false); }
+    else finish(true);
+  };
+
+  async function trial(freq, pan, L) {
+    const catchTrial = Math.random() < CATCH_P;
+    if (catchTrial) catchTotal++;
+    const p = waitResponse(catchTrial);
+    if (!catchTrial) playTone(freq, pan, L);
+    const heard = await p;
+    return { heard, catchTrial };
+  }
+
+  // Sesi kademeli artırarak ilk duyulan seviyeyi bul
+  async function ascendingRun(freq, pan, startL) {
+    let L = startL;
+    while (L >= 0) {
+      if (stopFlag) return undefined;
+      const { heard, catchTrial } = await trial(freq, pan, L);
+      await sleep(1200);
+      if (catchTrial) continue;
+      if (heard) return L;
+      L -= STEP_DB;
+    }
+    return null;
+  }
+
+  // İki kez ölç, ortalamasını al. Dönen değer kayıp puanı: 60 - L
+  async function thresholdFor(freq, pan) {
+    const r1 = await ascendingRun(freq, pan, START_L);
+    if (r1 == null) return null;
+    const r2 = await ascendingRun(freq, pan, Math.min(START_L, r1 + 10));
+    const L = (r2 == null) ? r1 : (r1 + r2) / 2;
+    return 60 - L;
+  }
+
+  // ---- Test akışı ----
+  function show(id) {
+    ['introView', 'testView', 'resultView', 'historyView'].forEach(v => $(v).hidden = (v !== id));
+  }
+  function setProgress(label, fraction) {
+    $('earLabel').textContent = label;
+    $('progressBar').style.width = Math.round(fraction * 100) + '%';
+  }
+
+  async function runTest() {
+    stopFlag = false; falseAlarms = 0; catchTotal = 0;
+    show('testView');
+    setProgress('Hazırlanıyor', 0);
+    $('statusText').textContent = 'Hazırlanıyor...';
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    await ctx.resume();
+
+    const res = { sag: {}, sol: {} };
+    let done = 0;
+    const total = EARS.length * FREQS.length;
+    for (const ear of EARS) {
+      for (const f of FREQS) {
+        if (stopFlag) break;
+        setProgress(`${ear.label} kulak · ${f} Hz`, done / total);
+        $('statusText').textContent = 'Sesi duyduğunda büyük butona bas';
+        const G = await thresholdFor(f, ear.pan);
+        if (stopFlag) break;
+        res[ear.key][f] = G;
+        done++;
+        await sleep(600);
+      }
+      if (stopFlag) break;
+    }
+    try { await ctx.close(); } catch (e) {}
+    ctx = null;
+
+    if (stopFlag) {
+      alert('Test durduruldu. Sonuçlar kaydedilmedi.');
+      show('introView');
+      return;
+    }
+    saveHistory(res);
+    renderResults(res);
+    show('resultView');
+  }
+
+  $('stopBtn').onclick = () => {
+    stopFlag = true;
+    finish(false);
+  };
+
+  // ---- Sonuçlar ----
+  function fmt(v) { return v == null ? '—' : v.toFixed(1); }
+
+  function renderResults(res) {
+    const body = $('resultBody');
+    body.innerHTML = '';
+    const diffs = [];
+    FREQS.forEach(f => {
+      const s = res.sag[f], l = res.sol[f];
+      const tr = document.createElement('tr');
+      let diffText = '—';
+      if (s != null && l != null) {
+        const d = s - l; diffs.push(d);
+        diffText = (d > 0 ? '+' : '') + d.toFixed(1);
+      }
+      tr.innerHTML = `<td>${f} Hz</td><td>${fmt(s)}</td><td>${fmt(l)}</td><td>${diffText}</td>`;
+      body.appendChild(tr);
+    });
+
+    let text;
+    if (diffs.length === 0) {
+      text = 'Yeterli veri oluşmadı. Testi tekrarla.';
+    } else {
+      const maxAbs = Math.max(...diffs.map(Math.abs));
+      const avgS = avg(FREQS.map(f => res.sag[f]).filter(v => v != null));
+      const avgL = avg(FREQS.map(f => res.sol[f]).filter(v => v != null));
+      if (maxAbs >= 10) {
+        const who = avgS > avgL ? 'sağ kulakta' : 'sol kulakta';
+        text = `Bazı frekanslarda kulaklar arasında belirgin fark var (yaklaşık 10 puan üzeri). Fark genel olarak ${who} daha yüksek. Bu bir tanı değildir; sonucu kulak doktorunla paylaş.`;
+      } else {
+        text = 'Bu taramada iki kulak arasında belirgin bir fark görünmedi. Bu, sağlıklı işitme anlamına gelmez; klinik test yerine geçmez.';
+      }
+    }
+    $('verdict').textContent = text;
+
+    const rel = $('reliability');
+    if (catchTotal >= 3 && falseAlarms / catchTotal > 0.4) {
+      rel.textContent = 'Sesin olmadığı anlarda çok fazla basış yapıldı. Sonuç güvenilir olmayabilir; sakin bir ortamda ve yalnızca ses duyduğunda basarak tekrarla.';
+      rel.hidden = false;
+    } else {
+      rel.hidden = true;
+    }
+  }
+  function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null; }
+
+  // ---- Geçmiş ----
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveHistory(res) {
+    const h = loadHistory();
+    h.unshift({ tarih: new Date().toLocaleString('tr-TR'), sag: res.sag, sol: res.sol });
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 30))); } catch (e) {}
+  }
+  function renderHistory() {
+    const list = $('historyList');
+    const h = loadHistory();
+    if (!h.length) { list.innerHTML = '<p class="small">Henüz kayıtlı test yok.</p>'; return; }
+    list.innerHTML = h.map(item => {
+      const parts = FREQS.map(f => {
+        const s = item.sag[f], l = item.sol[f];
+        return `${f} Hz: Sağ ${fmt(s)} / Sol ${fmt(l)}`;
+      }).join('<br>');
+      return `<div class="hist-item"><strong>${item.tarih}</strong><br>${parts}</div>`;
+    }).join('');
+  }
+
+  // ---- Sol / sağ kontrolü ----
+  $('checkLRBtn').onclick = async () => {
+    const c = new (window.AudioContext || window.webkitAudioContext)();
+    await c.resume();
+    const prev = ctx; ctx = c;
+    playTone(1000, -1, 25);
+    await sleep(1300);
+    playTone(1000, 1, 25);
+    await sleep(1300);
+    ctx = prev;
+    try { await c.close(); } catch (e) {}
+    $('introMsg').textContent = 'Önce sol kulakta, sonra sağ kulakta ses gelmeli. Ters geliyorsa kulaklığı çevir.';
+  };
+
+  // ---- Giriş kontrolleri ----
+  function updateStartBtn() {
+    $('startBtn').disabled = !($('chkWired').checked && $('chkQuiet').checked && $('chkLR').checked);
+  }
+  ['chkWired', 'chkQuiet', 'chkLR'].forEach(id => $(id).onchange = updateStartBtn);
+  $('startBtn').onclick = runTest;
+  $('historyBtn').onclick = () => { renderHistory(); show('historyView'); };
+  $('resultHistoryBtn').onclick = () => { renderHistory(); show('historyView'); };
+  $('backBtn').onclick = () => show('introView');
+  $('newTestBtn').onclick = () => show('introView');
+</script>
+</body>
+</html>
